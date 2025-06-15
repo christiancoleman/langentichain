@@ -46,9 +46,10 @@ def write_file(input_string: str) -> str:
         Success message or error
     """
     try:
-        # Parse input
+        # Parse input - be more flexible with separators
         if '|' not in input_string:
-            return "Error: Please use format 'filename|content' (separated by |)"
+            # Try to be helpful if user forgets the format
+            return "Error: Please use format 'filename|content' (separated by |). Example: 'report.txt|This is my report content'"
         
         parts = input_string.split('|', 1)
         if len(parts) != 2:
@@ -56,6 +57,13 @@ def write_file(input_string: str) -> str:
             
         file_path = parts[0].strip()
         content = parts[1]
+        
+        # Validate filename
+        if not file_path:
+            return "Error: No filename provided"
+        
+        # Clean up filename if needed
+        file_path = file_path.replace('filename.txt', 'output.txt')  # Fix common mistake
         
         # Expand user path and make absolute
         file_path = os.path.expanduser(file_path)

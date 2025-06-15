@@ -1,6 +1,7 @@
 import configparser
 import os
-from typing import Optional
+import warnings
+from typing import Optional, Dict, Any
 from langchain.agents import initialize_agent, AgentType, Tool
 from langchain_community.chat_models import ChatOllama
 from langchain_core.language_models.llms import LLM
@@ -8,6 +9,12 @@ from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain.memory import ConversationBufferMemory
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from openai import OpenAI
+
+# Import our modules
+from agent_config import get_agent_config, get_react_prompt
+
+# Suppress deprecation warnings for now
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Load configuration
 config = configparser.ConfigParser()
@@ -21,7 +28,7 @@ if config.getboolean('TOOLS', 'enable_web_search', fallback=True):
     tools_list.append(Tool(
         name="WebSearch", 
         func=search_web, 
-        description="Search the web for current information. Use this when you need to find recent data, news, or facts."
+        description="Search the web for current information. Use this when you need to find recent data, news, or facts. Input should be a search query string."
     ))
 
 if config.getboolean('TOOLS', 'enable_file_operations', fallback=True):
@@ -29,12 +36,12 @@ if config.getboolean('TOOLS', 'enable_file_operations', fallback=True):
     tools_list.append(Tool(
         name="ReadFile", 
         func=read_file, 
-        description="Read the contents of a file. Provide the file path as input."
+        description="Read the contents of a file. Input should be a file path as a string."
     ))
     tools_list.append(Tool(
         name="WriteFile", 
         func=write_file, 
-        description="Write content to a file. Use format: 'filename.txt|content to write'"
+        description="Write content to a file. Input format: 'filepath|content' where filepath is the target file and content is what to write."
     ))
 
 if config.getboolean('TOOLS', 'enable_salesforce', fallback=False):
@@ -67,6 +74,9 @@ class LMStudioLLM(LLM):
             api_key="not-needed"  # LM Studio doesn't require an API key
         )
         
+        # Clean up any thinking tags from the prompt
+        prompt = self._clean_thinking_tags(prompt)
+        
         response = client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
@@ -75,7 +85,16 @@ class LMStudioLLM(LLM):
             stop=stop
         )
         
-        return response.choices[0].message.content
+        # Clean up any thinking tags from the response
+        response_text = response.choices[0].message.content
+        return self._clean_thinking_tags(response_text)
+    
+    def _clean_thinking_tags(self, text: str) -> str:
+        """Remove <think> tags and their content"""
+        import re
+        # Remove <think>...</think> tags and their content
+        cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+        return cleaned.strip()
     
     @property
     def _llm_type(self) -> str:
@@ -109,32 +128,57 @@ def get_llm():
         raise ValueError(f"Unknown provider: {provider}")
 
 
-# Initialize components
-llm = get_llm()
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+def create_agent():
+    """Create and configure the agent with proper settings"""
+    llm = get_llm()
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    agent_config = get_agent_config(config)
+    
+    # Create agent with custom configuration
+    agent = initialize_agent(
+        tools=tools_list,
+        llm=llm,
+        agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
+        memory=memory,
+        **agent_config  # Unpack all agent settings including max_iterations
+    )
+    
+    return agent
 
-agent = initialize_agent(
-    tools=tools_list,
-    llm=llm,
-    agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
-    memory=memory,
-    verbose=True,
-    handle_parsing_errors=True,
-    max_iterations=5
-)
 
-def run_agent(user_input):
-    """Run the agent with error handling"""
+# Initialize the agent
+agent = create_agent()
+
+
+def run_agent(user_input: str) -> str:
+    """Run the agent with error handling using the new invoke method"""
     try:
-        return agent.run(user_input)
+        # Use invoke instead of run (addresses deprecation)
+        result = agent.invoke({"input": user_input})
+        
+        # Extract the output from the result
+        if isinstance(result, dict):
+            return result.get('output', str(result))
+        else:
+            return str(result)
+            
     except Exception as e:
-        return f"Error: {str(e)}"
+        error_msg = str(e)
+        
+        # Check for specific error types
+        if "iteration limit" in error_msg.lower():
+            return f"The agent reached the maximum iteration limit. This might indicate the task is too complex or the tools aren't providing clear enough responses. Error: {error_msg}"
+        elif "parsing" in error_msg.lower():
+            return f"The agent had trouble understanding the tool responses. Error: {error_msg}"
+        else:
+            return f"Error: {error_msg}"
 
 
 if __name__ == "__main__":
     # Test the agent
     print(f"Using {config.get('LLM', 'provider')} provider")
     print(f"Available tools: {[tool.name for tool in tools_list]}")
+    print(f"Max iterations: {config.getint('AGENT', 'max_iterations', fallback=1000)}")
     
     test_input = "What LLM provider am I using?"
     print(f"\nTest query: {test_input}")
