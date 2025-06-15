@@ -1,101 +1,214 @@
-# 🧠 LangEntiChain - Configurable Agentic Chat
+# LangEntiChain - Multi-Agent System
 
-A flexible agentic chat application built with LangChain that supports multiple LLM providers and tools.
+A multi-agent system powered by LangChain with intelligent routing. The system routes queries to specialized agents and provides real-time thinking visualization.
 
-## ✨ Features
+## 🌟 Features
 
-- **Multiple LLM Support**: Easy switching between Ollama and LM Studio via config file
-- **Web Search**: Search the web for current information
-- **File Operations**: Read and write files on your system
-- **Conversation Memory**: Maintains context throughout the chat
-- **Beautiful UI**: Streamlit-based interface with modern styling
+- **Intelligent Routing**: Routes queries based on complexity and task type
+- **Multi-Agent Architecture**: Specialized agents for different tasks:
+  - 🧠 **Planner Agent**: Decomposes complex tasks into executable steps
+  - 🌐 **Browser Agent**: Web automation with Selenium
+  - 💻 **Coder Agent**: Code generation and debugging
+  - 📁 **File Agent**: File system operations
+  - 🔍 **Search Agent**: Web search capabilities
+  - 💬 **Casual Agent**: Conversation and summaries
+- **Real-Time Thinking Visualization**: See how agents think and make decisions
+- **Streamlit Web Interface**: User-friendly UI with dark mode support
+- **Configurable LLM Support**: Works with Ollama and LM Studio
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
-### 1. Set up Virtual Environment
+### Prerequisites
 
+- Python 3.8+
+- Ollama or LM Studio running locally
+- Chrome/Chromium browser (for browser automation)
+
+### Installation
+
+1. Clone the repository:
 ```bash
-# Create virtual environment
-python -m venv my_langentichain_env
-
-# Activate it
-# Windows:
-.\my_langentichain_env\Scripts\activate
-# Linux/Mac:
-source my_langentichain_env/bin/activate
+git clone https://github.com/yourusername/langentichain.git
+cd langentichain
 ```
 
-### 2. Install Requirements
-
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configure LLM Provider
-
-Edit `config.ini` to choose your provider:
-
+3. Configure your LLM provider in `config.ini`:
 ```ini
 [LLM]
-# Provider options: ollama, lm_studio
-provider = lm_studio
-
-# Model names for each provider
-ollama_model = deepseek-coder:33b
-lm_studio_model = deepseek-r1-distill-qwen-14b-abliterated-v2
-
-# Server addresses
-ollama_address = http://localhost:11434
+provider = lm_studio  # or ollama
+lm_studio_model = your-model-name
 lm_studio_address = http://localhost:1234
 ```
 
-### 4. Run the Application
-
+4. Run the Streamlit interface:
 ```bash
 streamlit run streamlit_app.py
 ```
 
-## 🛠️ Available Tools
+## 🎯 Usage Examples
 
-- **WebSearch**: Search the web for current information
-- **ReadFile**: Read contents of files on your system
-- **WriteFile**: Create or overwrite files with new content
+### Simple Tasks (Direct Routing)
+- "What's the weather like?"
+- "Read the config.ini file"
+- "Write a Python hello world script"
+- "Search for Python tutorials"
 
-## 📝 Example Prompts
+### Complex Tasks (Multi-Step Planning)
+- "Search for the top 5 Python web frameworks, create a comparison table, and save it to a file"
+- "Find recent AI research papers and build a web interface to display them"
+- "Navigate to GitHub, search for awesome-python, and save the top 10 repos to a file"
 
-Try these prompts to test all features:
+## 🏗️ Architecture
 
-1. "Search the web for the current price of Bitcoin and save it to crypto_prices.txt"
-2. "Read the config.ini file and tell me which LLM provider I'm using"
-3. "Search for today's weather in New York and create a weather_report.txt file"
+### Routing System
 
-## 🐳 Docker Support
+The system uses an intelligent router to analyze queries:
 
-```bash
-docker build -t langchain-agentic-chat .
-docker run -p 8501:8501 langchain-agentic-chat
+1. **Complexity Estimation**: Determines if a query is simple or complex
+2. **Task Classification**: Routes simple queries to specific agents based on task type
+3. **Multi-Agent Coordination**: Complex queries are handled by the planner agent
+
+### Agent Communication Flow
+
+```
+User Query → Router (Complexity Analysis) → 
+  ├─ Complex → Planner Agent → Task Decomposition → Multiple Agents
+  └─ Simple → Direct Agent Assignment → Single Agent Execution
 ```
 
-## (Random emoji) Example Prompt
+## 🛠️ Configuration
 
->> Search the web for the current price of Bitcoin and Ethereum in USD, along with their 24-hour percentage changes. Then read the config.ini file in the current directory to identify which LLM provider I'm using. Finally, create a new file called 'crypto_report.txt' that contains: 1) Current date and time, 2) The cryptocurrency prices and changes you found, 3) The LLM provider from the config file, and 4) A brief 2-sentence analysis of whether crypto prices are trending up or down today. Format the report with clear headers for each section.
+### config.ini Options
+
+```ini
+[LLM]
+provider = lm_studio          # LLM provider: ollama or lm_studio
+temperature = 0.7            # Generation temperature
+max_tokens = 4096           # Maximum tokens per response
+
+[AGENT]
+max_iterations = 1000       # Max agent iterations
+verbose = true             # Show detailed agent output
+
+[BROWSER]
+headless = false          # Run browser in headless mode
+screenshot_on_navigate = true  # Take screenshots
+
+[TOOLS]
+enable_web_search = true
+enable_file_operations = true
+enable_browser = true
+```
 
 ## 🔧 Troubleshooting
 
-- **Ollama Connection**: Make sure Ollama is running (`ollama serve`)
-- **LM Studio Connection**: Ensure LM Studio server is running on port 1234
-- **File Permissions**: The app needs permission to read/write files in the directories you specify
+### Common Issues and Solutions
 
-## 📄 Configuration Options
+#### 1. Agent Gets Stuck or Loops
+**Symptoms**: Agent repeats the same action multiple times
 
-The `config.ini` file supports:
+**Solutions**:
+- Check that your LLM model supports tool calling properly
+- Try a different model (some models handle agents better)
+- Increase `temperature` in config.ini to 0.8 or 0.9
+- Ensure tools are returning clear, parseable responses
 
-- LLM provider selection (ollama/lm_studio)
-- Model configuration for each provider
-- Server addresses
-- Temperature and max token settings
-- Tool enabling/disabling
+#### 2. LM Studio Connection Failed
+**Symptoms**: Can't connect to LM Studio
+
+**Solutions**:
+- Ensure LM Studio server is running
+- Check it's on port 1234 (default)
+- Model must be loaded in LM Studio
+- Try http://localhost:1234/v1/models to verify
+
+#### 3. Ollama Connection Failed
+**Symptoms**: Can't connect to Ollama
+
+**Solutions**:
+- Run `ollama serve` in terminal
+- Pull your model: `ollama pull model-name`
+- Check port 11434 is available
+- Verify with: `curl http://localhost:11434/api/tags`
+
+#### 4. File Write Errors
+**Symptoms**: Agent can't create files
+
+**Solutions**:
+- Check file permissions in the directory
+- Use absolute paths if relative paths fail
+- Ensure no special characters in filenames
+- Remember the format: `filename|content`
+
+#### 5. Import Errors
+**Symptoms**: ModuleNotFoundError for langchain packages
+
+**Solutions**:
+```bash
+# Clean reinstall
+pip uninstall langchain langchain-community langchain-core -y
+pip install -r requirements.txt
+```
+
+#### 6. Browser Automation Issues
+**Symptoms**: Browser agent fails to navigate
+
+**Solutions**:
+- Install Chrome/Chromium browser
+- Update chromedriver to match your Chrome version
+- Check `headless` setting in config.ini
+- Ensure no other Chrome instances are running
+
+#### 7. Slow Response Times
+**Symptoms**: Agent takes long to respond
+
+**Solutions**:
+- Check model size vs. your hardware
+- Use smaller/faster models for testing
+- Reduce `max_tokens` in config.ini
+- Disable `verbose` mode for production use
+
+#### 8. Memory/Context Issues
+**Symptoms**: Agent forgets previous conversation
+
+**Solutions**:
+- ConversationBufferMemory is working but has limits
+- For long conversations, consider ConversationSummaryMemory
+- Clear chat history if context gets too large
+
+### Debug Mode
+
+Add this to your config.ini for maximum debugging:
+```ini
+[AGENT]
+verbose = true
+return_intermediate_steps = true
+```
+
+Then check the console output when running the app.
+
+## 📊 Thinking Visualization
+
+The system provides real-time visualization of agent thinking processes:
+
+- **Router Decisions**: See how queries are classified and routed
+- **Agent Actions**: Track what each agent is doing
+- **Thought Process**: Understand the reasoning behind decisions
 
 ## 🤝 Contributing
 
-Feel free to submit issues and enhancement requests!
+Contributions are welcome! Please feel free to submit pull requests or open issues.
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🙏 Acknowledgments
+
+- Built with [LangChain](https://github.com/langchain-ai/langchain)
+- UI powered by [Streamlit](https://streamlit.io)

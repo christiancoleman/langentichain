@@ -1,42 +1,36 @@
 import streamlit as st
 import configparser
-from main import run_agent, config, tools_list
+from main import run_agent, config, tools_list, get_thinking_logs
+import re
+import json
 
 # Page config
 st.set_page_config(
-    page_title="LangEntiChain - Agentic Chat", 
+    page_title="LangEntiChain - Multi-Agent System", 
     page_icon="🧠",
     layout="wide"
 )
 
-# Custom CSS for better styling and dark mode support
+# Custom CSS for better styling and thinking visualization
 st.markdown("""
 <style>
-    /* Light mode base */
+    /* Base styles */
     .stApp {
         background-color: #f0f2f6;
     }
     
-    /* Dark mode overrides */
+    /* Dark mode support */
     @media (prefers-color-scheme: dark) {
         .stApp {
             background-color: #0e1117;
         }
         
-        /* Fix white background in agent output */
-        .stMarkdown, .stCodeBlock, div[data-testid="stMarkdownContainer"] {
-            background-color: transparent !important;
-            color: inherit !important;
+        .thinking-log {
+            background-color: #1a1b26 !important;
+            border-color: #2d2e3f !important;
         }
         
-        /* Dark mode for code blocks */
-        pre {
-            background-color: #1e2127 !important;
-            color: #abb2bf !important;
-        }
-        
-        /* Dark mode for message containers */
-        div[data-testid="stChatMessage"] {
+        .log-entry {
             background-color: #262730 !important;
         }
     }
@@ -44,54 +38,116 @@ st.markdown("""
     .main-header {
         font-size: 2.5rem;
         font-weight: bold;
-        background: linear-gradient(90deg, #1e3a8a, #3b82f6);
+        background: linear-gradient(90deg, #667eea, #764ba2);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-align: center;
         padding: 1rem 0;
     }
     
-    .config-info {
-        background-color: rgba(59, 130, 246, 0.1);
+    /* Thinking visualization styles */
+    .thinking-log {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
         padding: 1rem;
-        border-radius: 0.5rem;
-        margin-bottom: 1rem;
-        border: 1px solid rgba(59, 130, 246, 0.3);
+        margin: 1rem 0;
+        max-height: 400px;
+        overflow-y: auto;
     }
     
-    .tool-badge {
-        background-color: #4f46e5;
-        color: white;
-        padding: 0.25rem 0.5rem;
-        border-radius: 0.25rem;
-        margin-right: 0.5rem;
+    .log-entry {
+        background-color: white;
+        padding: 0.5rem;
+        margin: 0.25rem 0;
+        border-radius: 4px;
+        font-family: monospace;
         font-size: 0.875rem;
     }
     
-    /* Fix for agent thinking output */
-    .agent-output {
-        white-space: pre-wrap;
-        font-family: monospace;
-        background-color: rgba(0, 0, 0, 0.05);
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 0.5rem 0;
+    .log-timestamp {
+        color: #6c757d;
+        font-weight: bold;
     }
     
-    /* Dark mode agent output */
-    @media (prefers-color-scheme: dark) {
-        .agent-output {
-            background-color: rgba(255, 255, 255, 0.05);
-        }
+    .log-level-info { color: #0066cc; }
+    .log-level-action { color: #28a745; }
+    .log-level-think { color: #6f42c1; }
+    .log-level-success { color: #28a745; font-weight: bold; }
+    .log-level-error { color: #dc3545; font-weight: bold; }
+    .log-level-warning { color: #ffc107; }
+    .log-level-start { color: #17a2b8; font-weight: bold; }
+    .log-level-decision { color: #e83e8c; font-weight: bold; }
+    .log-level-analyze { color: #fd7e14; }
+    .log-level-result { color: #20c997; }
+    
+    .agent-indicator {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-weight: 600;
+        display: inline-block;
+        margin: 0.5rem 0;
+        font-size: 0.875rem;
+    }
+    
+    .config-info {
+        background-color: rgba(102, 126, 234, 0.1);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        border: 1px solid rgba(102, 126, 234, 0.3);
     }
 </style>
 """, unsafe_allow_html=True)
 
+# Thinking display functions
+def format_log_entry(entry):
+    """Format a single log entry"""
+    timestamp = entry.get("timestamp", "")
+    level = entry.get("level", "info")
+    message = entry.get("message", "")
+    
+    return f'<div class="log-entry"><span class="log-timestamp">{timestamp}</span> <span class="log-level-{level}">[{level.upper()}]</span> {message}</div>'
+
+def display_thinking_logs(logs):
+    """Display thinking logs in a formatted way"""
+    # Router logs
+    if "router" in logs and logs["router"]:
+        st.markdown('<div class="agent-indicator">🧭 Router</div>', unsafe_allow_html=True)
+        router_html = '<div class="thinking-log">'
+        for entry in logs["router"]:
+            router_html += format_log_entry(entry)
+        router_html += '</div>'
+        st.markdown(router_html, unsafe_allow_html=True)
+    
+    # Agent logs
+    if "agents" in logs and logs["agents"]:
+        for agent_name, agent_logs in logs["agents"].items():
+            if agent_logs:
+                agent_emoji = {
+                    "planner": "🧠",
+                    "browser": "🌐",
+                    "coder": "💻",
+                    "file": "📁",
+                    "search": "🔍",
+                    "casual": "💬",
+                    "summary": "📋"
+                }.get(agent_name, "🤖")
+                
+                st.markdown(f'<div class="agent-indicator">{agent_emoji} {agent_name.title()} Agent</div>', unsafe_allow_html=True)
+                agent_html = '<div class="thinking-log">'
+                for entry in agent_logs:
+                    agent_html += format_log_entry(entry)
+                agent_html += '</div>'
+                st.markdown(agent_html, unsafe_allow_html=True)
+
 # Header
 st.markdown('<h1 class="main-header">🧠 LangEntiChain</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align: center; color: #6b7280;">Powered by LangChain with configurable LLM support</p>', unsafe_allow_html=True)
+st.markdown('<p style="text-align: center; color: #6b7280;">Multi-Agent System with Adaptive Routing</p>', unsafe_allow_html=True)
 
-# Sidebar with configuration info
+# Layout with sidebar
 with st.sidebar:
     st.header("⚙️ Configuration")
     
@@ -99,38 +155,53 @@ with st.sidebar:
     provider = config.get('LLM', 'provider', fallback='ollama')
     model = config.get('LLM', f'{provider}_model', fallback='unknown')
     
-    # Get agent config
-    max_iterations = config.getint('AGENT', 'max_iterations', fallback=1000)
-    
     st.info(f"""
+    **🤖 Multi-Agent Mode Active**  
     **LLM Provider:** {provider.upper()}  
     **Model:** {model}  
-    **Server:** {config.get('LLM', f'{provider}_address', fallback='localhost')}  
-    **Max Iterations:** {max_iterations}
+    **Server:** {config.get('LLM', f'{provider}_address', fallback='localhost')}
     """)
     
-    # Show available tools
-    st.subheader("🛠️ Available Tools")
-    for tool in tools_list:
-        st.write(f"• **{tool.name}** - {tool.description[:50]}...")
+    # Available agents
+    st.subheader("🤖 Specialized Agents")
+    agent_info = {
+        "🧠 Planner": "Decomposes complex tasks into steps",
+        "🌐 Browser": "Web automation & navigation",
+        "💻 Coder": "Code generation & debugging",
+        "📁 File": "File system operations",
+        "🔍 Search": "Web search capabilities",
+        "💬 Casual": "Conversation & summaries"
+    }
     
-    # Instructions
-    st.subheader("📝 Instructions")
-    st.markdown("""
-    This agent can:
-    - 🔍 Search the web for information
-    - 📄 Read files from your system
-    - 💾 Write content to files
-    - 🤖 Maintain conversation context
+    for agent, desc in agent_info.items():
+        st.write(f"{agent}: {desc}")
     
-    Try asking it to search for information and save it to a file!
-    """)
+    # Show thinking logs toggle
+    if 'show_thinking' not in st.session_state:
+        st.session_state.show_thinking = True
     
-    # Show example prompt
-    with st.expander("📋 Example Test Prompt"):
-        st.code("""Search the web for the current price of Bitcoin and Ethereum in USD, along with their 24-hour percentage changes. Then read the config.ini file in the current directory to identify which LLM provider I'm using. Finally, create a new file called 'crypto_report.txt' that contains: 1) Current date and time, 2) The cryptocurrency prices and changes you found, 3) The LLM provider from the config file, and 4) A brief 2-sentence analysis of whether crypto prices are trending up or down today.""")
+    st.session_state.show_thinking = st.checkbox(
+        "Show Agent Thinking",
+        value=st.session_state.show_thinking,
+        help="Display the thinking process of agents"
+    )
     
-    # Clear history button
+    # Example prompts
+    with st.expander("📋 Example Prompts"):
+        st.markdown("""
+        **Simple Tasks:**
+        - "What's the weather like?"
+        - "Read the README.md file"
+        - "Write a Python hello world script"
+        
+        **Complex Tasks:**
+        - "Search for Python web frameworks, compare them, and save to a file"
+        - "Find recent AI news and create a summary report"
+        - "Build a simple web scraper for news headlines"
+        - "Research machine learning libraries and create documentation"
+        """)
+    
+    # Clear chat button
     if st.button("🗑️ Clear Chat History"):
         st.session_state.messages = []
         st.rerun()
@@ -139,21 +210,36 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display chat messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        if message["role"] == "assistant":
-            # Clean up any remaining think tags in display
-            content = message["content"]
-            import re
-            content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
-            st.markdown(content)
-        else:
+# Main content area
+col1, col2 = st.columns([3, 1])
+
+with col1:
+    # Welcome message
+    if len(st.session_state.messages) == 0:
+        st.info("""
+        👋 Welcome to the Multi-Agent System!
+        
+        I use adaptive routing to intelligently handle both simple and complex tasks:
+        - **Simple tasks** go directly to specialized agents
+        - **Complex tasks** are planned and executed step-by-step
+        
+        Try asking me something complex like: "Search for the top Python web frameworks and create a comparison file"
+        """)
+    
+    # Display chat messages
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            
+            # Show thinking logs if enabled and available
+            if message["role"] == "assistant" and st.session_state.show_thinking:
+                if "thinking_logs" in message:
+                    with st.expander("🧠 Agent Thinking Process", expanded=False):
+                        display_thinking_logs(message["thinking_logs"])
 
 # Chat input
 if prompt := st.chat_input("Ask your AI assistant..."):
-    # Add user message to chat history
+    # Add user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     # Display user message
@@ -164,26 +250,37 @@ if prompt := st.chat_input("Ask your AI assistant..."):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         
-        # Show thinking message while processing
-        with st.spinner("🤔 Agent is thinking..."):
+        with st.spinner("🤔 Processing your request..."):
+            # Run agent
             response = run_agent(prompt)
-        
-        # Clean any think tags from response
-        import re
-        response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
-        
-        # Display the response
-        message_placeholder.markdown(response)
+            
+            # Get thinking logs
+            thinking_logs = get_thinking_logs()
+            
+            # Clean response
+            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+            
+            # Display response
+            message_placeholder.markdown(response)
+            
+            # Show thinking logs inline if enabled
+            if st.session_state.show_thinking and thinking_logs:
+                with st.expander("🧠 Agent Thinking Process", expanded=True):
+                    display_thinking_logs(thinking_logs)
     
-    # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": response})
+    # Add assistant response to history
+    st.session_state.messages.append({
+        "role": "assistant", 
+        "content": response,
+        "thinking_logs": thinking_logs
+    })
 
 # Footer
 st.markdown("---")
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.markdown('<small>Configure in config.ini</small>', unsafe_allow_html=True)
+    st.markdown('<small>🚀 Multi-Agent System</small>', unsafe_allow_html=True)
 with col2:
-    st.markdown('<small>Max iterations: ' + str(max_iterations) + '</small>', unsafe_allow_html=True)
+    st.markdown('<small>⚡ Powered by Adaptive Routing</small>', unsafe_allow_html=True)
 with col3:
-    st.markdown('<small>Built with LangChain & Streamlit</small>', unsafe_allow_html=True)
+    st.markdown('<small>🛠️ Built with LangChain</small>', unsafe_allow_html=True)

@@ -1,185 +1,202 @@
-import configparser
+"""
+LangEntiChain - Multi-Agent System with Adaptive Routing
+Single mode: Always uses multi-agent orchestration
+"""
+
 import os
-import warnings
-from typing import Optional, Dict, Any
-from langchain.agents import initialize_agent, AgentType, Tool
-from langchain_community.chat_models import ChatOllama
+import configparser
+from typing import List
 from langchain_core.language_models.llms import LLM
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
-from langchain.memory import ConversationBufferMemory
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from openai import OpenAI
+from langchain.agents import Tool
+from multi_agent_system import MultiAgentOrchestrator
+from browser_tool import create_browser_driver
 
-# Import our modules
-from agent_config import get_agent_config, get_react_prompt
-
-# Suppress deprecation warnings for now
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+# Import tools
+from tools.file_operations import read_file, write_file, list_files
+from tools.web_browser import search_web
 
 # Load configuration
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-# Import tools based on config
-tools_list = []
-
-if config.getboolean('TOOLS', 'enable_web_search', fallback=True):
-    from tools.web_browser import search_web
-    tools_list.append(Tool(
-        name="WebSearch", 
-        func=search_web, 
-        description="Search the web for current information. Use this when you need to find recent data, news, or facts. Input should be a search query string."
-    ))
-
-if config.getboolean('TOOLS', 'enable_file_operations', fallback=True):
-    from tools.file_operations import read_file, write_file
-    tools_list.append(Tool(
-        name="ReadFile", 
-        func=read_file, 
-        description="Read the contents of a file. Input should be a file path as a string."
-    ))
-    tools_list.append(Tool(
-        name="WriteFile", 
-        func=write_file, 
-        description="Write content to a file. Input format: 'filepath|content' where filepath is the target file and content is what to write."
-    ))
-
-if config.getboolean('TOOLS', 'enable_salesforce', fallback=False):
-    from tools.salesforce import search_salesforce
-    tools_list.append(Tool(
-        name="SalesforceSearch", 
-        func=search_salesforce, 
-        description="Search Salesforce for data"
-    ))
+# Tool definitions for reference
+tools_list = [
+    Tool(
+        name="WebSearch",
+        func=search_web,
+        description="Search the web for information. Input: search query"
+    ),
+    Tool(
+        name="ReadFile",
+        func=read_file,
+        description="Read the contents of a file. Input: file path"
+    ),
+    Tool(
+        name="WriteFile",
+        func=write_file,
+        description="Write content to a file. Input: 'filepath|content'"
+    ),
+    Tool(
+        name="ListFiles",
+        func=list_files,
+        description="List files in a directory. Input: directory path"
+    )
+]
 
 
-class LMStudioLLM(LLM):
-    """Custom LLM class for LM Studio integration"""
+class CustomLLM(LLM):
+    """Custom LLM wrapper for Ollama or LM Studio"""
     
-    model: str
-    base_url: str
-    temperature: float = 0.7
-    max_tokens: int = 4096
+    @property
+    def _llm_type(self) -> str:
+        return "custom"
     
     def _call(
         self,
         prompt: str,
-        stop: Optional[list] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
-        **kwargs,
+        stop: List[str] = None,
+        run_manager: CallbackManagerForLLMRun = None,
     ) -> str:
-        """Call LM Studio API"""
-        client = OpenAI(
-            base_url=f"{self.base_url}/v1",
-            api_key="not-needed"  # LM Studio doesn't require an API key
-        )
+        provider = config.get('LLM', 'provider', fallback='ollama')
         
-        # Clean up any thinking tags from the prompt
-        prompt = self._clean_thinking_tags(prompt)
-        
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            stop=stop
-        )
-        
-        # Clean up any thinking tags from the response
-        response_text = response.choices[0].message.content
-        return self._clean_thinking_tags(response_text)
+        if provider == 'ollama':
+            return self._call_ollama(prompt)
+        elif provider == 'lm_studio':
+            return self._call_lm_studio(prompt)
+        else:
+            raise ValueError(f"Unknown provider: {provider}")
     
-    def _clean_thinking_tags(self, text: str) -> str:
-        """Remove <think> tags and their content"""
-        import re
-        # Remove <think>...</think> tags and their content
-        cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-        return cleaned.strip()
+    def _call_ollama(self, prompt: str) -> str:
+        import requests
+        
+        address = config.get('LLM', 'ollama_address', fallback='http://localhost:11434')
+        model = config.get('LLM', 'ollama_model', fallback='deepseek-coder:33b')
+        
+        try:
+            response = requests.post(
+                f"{address}/api/generate",
+                json={
+                    "model": model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "temperature": config.getfloat('LLM', 'temperature', fallback=0.7),
+                    "max_tokens": config.getint('LLM', 'max_tokens', fallback=4096)
+                }
+            )
+            response.raise_for_status()
+            return response.json()['response']
+        except Exception as e:
+            print(f"Ollama error: {e}")
+            return f"Error calling Ollama: {str(e)}"
     
-    @property
-    def _llm_type(self) -> str:
-        return "lm_studio"
+    def _call_lm_studio(self, prompt: str) -> str:
+        import requests
+        
+        address = config.get('LLM', 'lm_studio_address', fallback='http://localhost:1234')
+        
+        try:
+            response = requests.post(
+                f"{address}/v1/completions",
+                json={
+                    "prompt": prompt,
+                    "temperature": config.getfloat('LLM', 'temperature', fallback=0.7),
+                    "max_tokens": config.getint('LLM', 'max_tokens', fallback=4096),
+                    "stream": False
+                }
+            )
+            response.raise_for_status()
+            return response.json()['choices'][0]['text']
+        except Exception as e:
+            print(f"LM Studio error: {e}")
+            return f"Error calling LM Studio: {str(e)}"
 
 
 def get_llm():
-    """Initialize LLM based on config"""
-    provider = config.get('LLM', 'provider', fallback='ollama')
-    
-    if provider == 'ollama':
-        model = config.get('LLM', 'ollama_model', fallback='deepseek-coder:33b')
-        base_url = config.get('LLM', 'ollama_address', fallback='http://localhost:11434')
-        return ChatOllama(
-            model=model,
-            base_url=base_url,
-            temperature=config.getfloat('LLM', 'temperature', fallback=0.7)
-        )
-    
-    elif provider == 'lm_studio':
-        model = config.get('LLM', 'lm_studio_model')
-        base_url = config.get('LLM', 'lm_studio_address', fallback='http://localhost:1234')
-        return LMStudioLLM(
-            model=model,
-            base_url=base_url,
-            temperature=config.getfloat('LLM', 'temperature', fallback=0.7),
-            max_tokens=config.getint('LLM', 'max_tokens', fallback=4096)
-        )
-    
-    else:
-        raise ValueError(f"Unknown provider: {provider}")
+    """Get the configured LLM instance"""
+    return CustomLLM()
 
 
-def create_agent():
-    """Create and configure the agent with proper settings"""
+# Global agent instance
+agent = None
+orchestrator = None
+
+
+def initialize_agent():
+    """Initialize the multi-agent orchestrator"""
+    global agent, orchestrator
+    
+    print("🚀 Initializing Multi-Agent System...")
+    
+    # Get LLM
     llm = get_llm()
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    agent_config = get_agent_config(config)
     
-    # Create agent with custom configuration
-    agent = initialize_agent(
-        tools=tools_list,
-        llm=llm,
-        agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
-        memory=memory,
-        **agent_config  # Unpack all agent settings including max_iterations
-    )
+    # Create browser driver if enabled
+    browser_driver = None
+    if config.getboolean('TOOLS', 'enable_browser', fallback=True):
+        try:
+            browser_driver = create_browser_driver()
+            print("✅ Browser automation enabled")
+        except Exception as e:
+            print(f"⚠️ Browser automation disabled: {e}")
     
-    return agent
+    # Create orchestrator
+    orchestrator = MultiAgentOrchestrator(llm, browser_driver)
+    agent = orchestrator
+    
+    print("✅ Multi-Agent System ready!")
+    print("   - Planner Agent: Handles complex multi-step tasks")
+    print("   - Browser Agent: Web automation and navigation")
+    print("   - Coder Agent: Code generation and debugging")
+    print("   - File Agent: File system operations")
+    print("   - Search Agent: Web search capabilities")
+    print("   - Casual Agent: Conversation and summaries")
 
 
-# Initialize the agent
-agent = create_agent()
-
-
-def run_agent(user_input: str) -> str:
-    """Run the agent with error handling using the new invoke method"""
+def run_agent(query: str) -> str:
+    """Run the agent with a query"""
+    global agent
+    
+    if agent is None:
+        initialize_agent()
+    
     try:
-        # Use invoke instead of run (addresses deprecation)
-        result = agent.invoke({"input": user_input})
-        
-        # Extract the output from the result
-        if isinstance(result, dict):
-            return result.get('output', str(result))
-        else:
-            return str(result)
-            
+        result = agent.run(query)
+        return result
     except Exception as e:
-        error_msg = str(e)
-        
-        # Check for specific error types
-        if "iteration limit" in error_msg.lower():
-            return f"The agent reached the maximum iteration limit. This might indicate the task is too complex or the tools aren't providing clear enough responses. Error: {error_msg}"
-        elif "parsing" in error_msg.lower():
-            return f"The agent had trouble understanding the tool responses. Error: {error_msg}"
-        else:
-            return f"Error: {error_msg}"
+        return f"Error: {str(e)}"
 
 
-if __name__ == "__main__":
-    # Test the agent
-    print(f"Using {config.get('LLM', 'provider')} provider")
-    print(f"Available tools: {[tool.name for tool in tools_list]}")
-    print(f"Max iterations: {config.getint('AGENT', 'max_iterations', fallback=1000)}")
+def get_thinking_logs():
+    """Get thinking logs from the orchestrator"""
+    global orchestrator
     
-    test_input = "What LLM provider am I using?"
-    print(f"\nTest query: {test_input}")
-    print(f"Response: {run_agent(test_input)}")
+    if orchestrator is not None:
+        return orchestrator.get_thinking_logs()
+    return {"router": [], "agents": {}}
+
+
+# Auto-initialize on import
+if __name__ != "__main__":
+    initialize_agent()
+
+
+# CLI interface
+if __name__ == "__main__":
+    print("🤖 LangEntiChain - Multi-Agent CLI")
+    print("Type 'quit' to exit")
+    print()
+    
+    while True:
+        query = input("You: ").strip()
+        
+        if query.lower() in ['quit', 'exit', 'q']:
+            break
+        
+        if not query:
+            continue
+        
+        print("\nAgent: ", end="", flush=True)
+        response = run_agent(query)
+        print(response)
+        print()
