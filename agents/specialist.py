@@ -97,7 +97,7 @@ def create_specialist_agents(llm: LLM, thinking_log: AgentThinkingLog, browser_d
 			thinking_log.log(f"Navigation complete", "success")
 			return result
 		
-		def log_extract() -> str:
+		def log_extract(dummy_input: str = "") -> str:
 			thinking_log.log("Extracting text from page", "action")
 			result = browser_tool.get_page_text()
 			thinking_log.log(f"Extracted {len(result)} characters", "info")
@@ -116,12 +116,24 @@ def create_specialist_agents(llm: LLM, thinking_log: AgentThinkingLog, browser_d
 			return result
 		
 		browser_tools = [
-			Tool(name="NavigateTo", func=log_navigate, description="Navigate to URL"),
-			Tool(name="ExtractText", func=log_extract, description="Extract page text"),
-			Tool(name="FillForm", func=log_fill_form, description="Fill form: {'field': 'value'}"),
-			Tool(name="Click", func=log_click, description="Click element by text/selector"),
-			Tool(name="Screenshot", func=browser_tool.take_screenshot, description="Take screenshot")
+			Tool(name="NavigateTo", func=log_navigate, description="Navigate to a URL. Input should be the URL to visit."),
+			Tool(name="ExtractText", func=log_extract, description="Extract text from current page. Input can be empty string or anything."),
+			Tool(name="FillForm", func=log_fill_form, description="Fill form fields. Input should be JSON like: {\"username\": \"myname\", \"password\": \"mypass\"}"),
+			Tool(name="Click", func=log_click, description="Click an element. Input should be the link text or CSS selector.")
 		]
+		
+		def log_screenshot(filename: str = "") -> str:
+			thinking_log.log("Taking screenshot", "action")
+			if filename:
+				result = browser_tool.take_screenshot(filename)
+			else:
+				result = browser_tool.take_screenshot()
+			thinking_log.log("Screenshot saved", "success")
+			return result
+		
+		browser_tools.append(
+			Tool(name="Screenshot", func=log_screenshot, description="Take a screenshot. Input is optional filename (leave empty for auto-generated name).")
+		)
 		
 		agents["browser"] = create_agent_with_system_prompt(
 			tools=browser_tools,
@@ -158,9 +170,9 @@ def create_specialist_agents(llm: LLM, thinking_log: AgentThinkingLog, browser_d
 		return result
 	
 	file_tools = [
-		Tool(name="ReadFile", func=log_read_file, description="Read file: path"),
-		Tool(name="WriteFile", func=log_write_file, description="Write file: 'path|content'"),
-		Tool(name="ListFiles", func=log_list_files, description="List files: directory")
+		Tool(name="ReadFile", func=log_read_file, description="Read file contents. Input should be the file path."),
+		Tool(name="WriteFile", func=log_write_file, description="Write content to a file. Input format: filepath|content to write"),
+		Tool(name="ListFiles", func=log_list_files, description="List files in a directory. Input should be the directory path.")
 	]
 	
 	agents["file"] = create_agent_with_system_prompt(
@@ -181,7 +193,7 @@ def create_specialist_agents(llm: LLM, thinking_log: AgentThinkingLog, browser_d
 		return result
 	
 	search_tools = [
-		Tool(name="WebSearch", func=log_search, description="Search web: query")
+		Tool(name="WebSearch", func=log_search, description="Search the web for information. Input should be your search query.")
 	]
 	
 	agents["search"] = create_agent_with_system_prompt(
@@ -202,7 +214,7 @@ def create_specialist_agents(llm: LLM, thinking_log: AgentThinkingLog, browser_d
 		return f"I'll write the code for: {request}"
 	
 	coder_tools = [
-		Tool(name="WriteCode", func=log_write_code, description="Write code: requirements")
+		Tool(name="WriteCode", func=log_write_code, description="Generate code based on requirements. Input should describe what code you need.")
 	]
 	
 	agents["coder"] = create_agent_with_system_prompt(

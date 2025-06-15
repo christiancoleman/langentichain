@@ -14,6 +14,7 @@ def create_planner_prompt() -> PromptTemplate:
 Available agents and their capabilities:
 - Browser: Can navigate websites, fill forms, click elements, extract information, take screenshots
   (Cannot: download files, handle popups, execute JavaScript)
+  Example: Browser agent navigates to URL, extracts text with ExtractText tool (use "" as input), fills forms
 - Coder: Can write, debug, and explain code in multiple languages
   (Cannot: execute code, run tests, or interact with running programs)
 - File: Can read, write, list, and organize files on the system

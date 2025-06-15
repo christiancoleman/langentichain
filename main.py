@@ -24,22 +24,22 @@ tools_list = [
 	Tool(
 		name="WebSearch",
 		func=search_web,
-		description="Search the web for information. Input: search query"
+		description="Search the web for information. Input should be your search query."
 	),
 	Tool(
 		name="ReadFile",
 		func=read_file,
-		description="Read the contents of a file. Input: file path"
+		description="Read the contents of a file. Input should be the file path."
 	),
 	Tool(
 		name="WriteFile",
 		func=write_file,
-		description="Write content to a file. Input: 'filepath|content'"
+		description="Write content to a file. Input format: filepath|content to write"
 	),
 	Tool(
 		name="ListFiles",
 		func=list_files,
-		description="List files in a directory. Input: directory path"
+		description="List files in a directory. Input should be the directory path."
 	)
 ]
 

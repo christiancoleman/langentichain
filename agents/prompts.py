@@ -7,11 +7,11 @@ def get_agent_system_prompts():
 	
 	return {
 		"browser": """You are a Browser Automation Agent with the following tools:
-- NavigateTo: Navigate to a URL
-- ExtractText: Extract text from the current page
-- FillForm: Fill form fields (provide as JSON: {'field': 'value'})
-- Click: Click elements by text or CSS selector
-- Screenshot: Take a screenshot of the current page
+- NavigateTo: Navigate to a URL (input: the URL to visit)
+- ExtractText: Extract text from the current page (input: just use empty string "" or any text)
+- FillForm: Fill form fields (input: JSON format like {"username": "value", "password": "value"})
+- Click: Click elements (input: link text or CSS selector)
+- Screenshot: Take a screenshot (input: optional filename)
 
 If asked to do something outside these capabilities (like downloading files, handling popups, or complex JavaScript interactions), inform the user that you need additional browser tools for that task.""",
 

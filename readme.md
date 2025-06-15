@@ -181,6 +181,24 @@ pip install -r requirements.txt
 - For long conversations, consider ConversationSummaryMemory
 - Clear chat history if context gets too large
 
+### 9. Missing Input Keys Error
+**Symptoms**: `ValueError: Missing some input keys: {'input'}`
+
+**Solutions**:
+- Use `agent.invoke({"input": query})` instead of `agent.run(query)`
+- The new LangChain API expects dictionary input
+- Extract output with `result.get('output', result)`
+
+### 10. Deprecation Warnings
+**Symptoms**: Various deprecation warnings about old methods
+
+**Solutions**:
+- These are informational - code still works
+- Update to new methods when convenient:
+  - `.run()` → `.invoke()`
+  - `AgentExecutor` → Consider `LangGraph` for new projects
+- See `UNDERSTANDING_ERRORS.md` for detailed migration guide
+
 ### Debug Mode
 
 Add this to your config.ini for maximum debugging:
