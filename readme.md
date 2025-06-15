@@ -76,6 +76,10 @@ docker build -t langchain-agentic-chat .
 docker run -p 8501:8501 langchain-agentic-chat
 ```
 
+## (Random emoji) Example Prompt
+
+>> Search the web for the current price of Bitcoin and Ethereum in USD, along with their 24-hour percentage changes. Then read the config.ini file in the current directory to identify which LLM provider I'm using. Finally, create a new file called 'crypto_report.txt' that contains: 1) Current date and time, 2) The cryptocurrency prices and changes you found, 3) The LLM provider from the config file, and 4) A brief 2-sentence analysis of whether crypto prices are trending up or down today. Format the report with clear headers for each section.
+
 ## 🔧 Troubleshooting
 
 - **Ollama Connection**: Make sure Ollama is running (`ollama serve`)
