@@ -6,10 +6,10 @@ from langchain.prompts import PromptTemplate
 
 
 def create_planner_prompt() -> PromptTemplate:
-    """Create the prompt template for the planner agent"""
-    return PromptTemplate(
-        input_variables=["input"],
-        template="""You are an advanced project manager that divides complex tasks into smaller sub-tasks.
+	"""Create the prompt template for the planner agent"""
+	return PromptTemplate(
+		input_variables=["input"],
+		template="""You are an advanced project manager that divides complex tasks into smaller sub-tasks.
 
 Available agents and their capabilities:
 - Browser: Can navigate websites, fill forms, click elements, extract information, take screenshots
@@ -29,24 +29,24 @@ Output format MUST be valid JSON:
 ```json
 {{
   "plan": [
-    {{
-      "agent": "Search",
-      "id": "1", 
-      "need": [],
-      "task": "Search the web for the top 5 Python web frameworks"
-    }},
-    {{
-      "agent": "Coder",
-      "id": "2",
-      "need": ["1"],
-      "task": "Create a comparison table of the frameworks found"
-    }},
-    {{
-      "agent": "File",
-      "id": "3",
-      "need": ["2"],
-      "task": "Save the comparison table to frameworks_comparison.md"
-    }}
+	{{
+	  "agent": "Search",
+	  "id": "1", 
+	  "need": [],
+	  "task": "Search the web for the top 5 Python web frameworks"
+	}},
+	{{
+	  "agent": "Coder",
+	  "id": "2",
+	  "need": ["1"],
+	  "task": "Create a comparison table of the frameworks found"
+	}},
+	{{
+	  "agent": "File",
+	  "id": "3",
+	  "need": ["2"],
+	  "task": "Save the comparison table to frameworks_comparison.md"
+	}}
   ]
 }}
 ```
@@ -63,4 +63,4 @@ Rules:
 Task: {input}
 
 Create a comprehensive plan:"""
-    )
+	)

@@ -16,12 +16,11 @@ chrome_bundle/
 .screenshots/*.png
 .screenshots/*.jpg
 conversations/
-agentic_env/*
-agentic_seek_env/*
 .env
 */.env
 dsk/
 chrome136/
+_deprecated/
 
 ### react ###
 .DS_*
@@ -174,6 +173,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+3.11.3/
+_langentichain_env/
 
 # Spyder project settings
 .spyderproject
