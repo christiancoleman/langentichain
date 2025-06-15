@@ -134,7 +134,9 @@ def initialize_agent():
 	browser_driver = None
 	if config.getboolean('TOOLS', 'enable_browser', fallback=True):
 		try:
-			browser_driver = create_browser_driver()
+			# Get headless setting from config
+			headless = config.getboolean('BROWSER', 'headless', fallback=False)
+			browser_driver = create_browser_driver(headless=headless)
 			print("✅ Browser automation enabled")
 		except Exception as e:
 			print(f"⚠️ Browser automation disabled: {e}")

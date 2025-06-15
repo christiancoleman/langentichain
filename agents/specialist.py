@@ -12,10 +12,6 @@ from langchain.agents import AgentExecutor
 
 from tools.file_operations import read_file, write_file, list_files
 from tools.web_browser import search_web
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from browser_tool import BrowserTool
 from core.thinking_log import AgentThinkingLog
 from .prompts import get_agent_system_prompts, get_tool_error_handler

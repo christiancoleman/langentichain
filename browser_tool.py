@@ -33,6 +33,19 @@ def create_browser_driver(headless: bool = True) -> webdriver.Chrome:
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
+    # Suppress Chrome warnings and errors
+    chrome_options.add_argument("--log-level=3")  # Fatal errors only
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    chrome_options.add_argument("--silent")
+    
+    # Disable images and CSS for faster loading (optional)
+    prefs = {
+        "profile.default_content_setting_values": {
+            "notifications": 2  # Block notifications
+        }
+    }
+    chrome_options.add_experimental_option("prefs", prefs)
+    
     # Create temp profile
     user_data_dir = tempfile.mkdtemp(prefix="chrome_profile_")
     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
@@ -290,10 +303,17 @@ class BrowserTool:
 
 # Test the browser tool
 if __name__ == "__main__":
+    import configparser
+    
     print("Testing Browser Tool...")
     
+    # Load config
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    headless = config.getboolean('BROWSER', 'headless', fallback=False)
+    
     # Create browser
-    driver = create_browser_driver(headless=False)
+    driver = create_browser_driver(headless=headless)
     browser = BrowserTool(driver)
     
     try:
