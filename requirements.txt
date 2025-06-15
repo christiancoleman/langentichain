@@ -1,4 +1,8 @@
 langchain
+langchain-community
+langchain-core
 ollama
 python-dotenv
 streamlit
+openai
+requests
