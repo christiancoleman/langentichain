@@ -1,3 +1,7 @@
+# This has been abandoned! Was used in order to learn more about agentic coding!
+
+-------------------------------------------------------------------
+
 # LangEntiChain - Multi-Agent System
 
 A multi-agent system powered by LangChain with intelligent routing. The system routes queries to specialized agents and provides real-time thinking visualization.
